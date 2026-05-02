@@ -52,6 +52,6 @@ Right now, the Backend worker and the React Native frontend bypass the database 
 2. **Generate the Key:** Go to Project Settings -> Service Accounts -> "Generate new private key".
 3. **Add Key to Backend:** Save the downloaded file as `serviceAccountKey.json` and place it directly inside the `backend/` folder.
 4. **Uncomment the Database Logic:**
-   - Open `backend/main.py`. The script is already designed to automatically reconnect once it detects the `serviceAccountKey.json` file, so it will instantly start writing to Firebase.
+   - Open `backend/app.py`. The script is already designed to automatically reconnect once it detects the `serviceAccountKey.json` file, so it will instantly start writing to Firebase.
    - Open `frontend/src/services/firebase.ts`. Replace `YOUR_API_KEY`, `YOUR_PROJECT_ID`, etc., with the config snippet provided by Firebase.
    - Revert the `useEffect` hooks in the React Native screens (`DashboardScreen.tsx` and `HistoryScreen.tsx`) to pull actual data using the Firebase services instead of the random mock-data intervals.

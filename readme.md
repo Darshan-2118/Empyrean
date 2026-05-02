@@ -42,7 +42,7 @@ A comprehensive IoT monitoring and management system with Python backend and Rea
 
 5. **Run the backend:**
    ```bash
-   python main.py
+   python app.py
    ```
 
 ### Frontend Setup
