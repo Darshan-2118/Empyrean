@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 interface MapProps {
@@ -42,6 +42,17 @@ export const Map: React.FC<MapProps> = ({ markers }) => {
       </body>
     </html>
   `;
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        <iframe 
+          srcDoc={mapHtml} 
+          style={{ width: '100%', height: '100%', border: 'none' }} 
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

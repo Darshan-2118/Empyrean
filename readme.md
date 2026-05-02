@@ -1,4 +1,4 @@
-# Atmos
+# Empyrean
 
 A comprehensive IoT monitoring and management system with Python backend and React Native frontend.
 
@@ -13,15 +13,17 @@ A comprehensive IoT monitoring and management system with Python backend and Rea
 ### Backend Setup
 
 1. **Navigate to the backend folder:**
+
    ```bash
    cd backend
    ```
 
 2. **Create and activate the virtual environment:**
+
    ```bash
    # Create venv (if not already created)
    python -m venv .venv
-   
+
    # Activate venv
    .venv\Scripts\activate  # Windows
    # or
@@ -29,6 +31,7 @@ A comprehensive IoT monitoring and management system with Python backend and Rea
    ```
 
 3. **Install dependencies:**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -45,18 +48,21 @@ A comprehensive IoT monitoring and management system with Python backend and Rea
 ### Frontend Setup
 
 1. **Navigate to the frontend folder:**
+
    ```bash
    cd frontend
    ```
 
 2. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 3. **Start the development server:**
+
    ```bash
-   npm start
+   npm run dev
    ```
 
 4. **Run on specific platform:**
@@ -69,11 +75,13 @@ A comprehensive IoT monitoring and management system with Python backend and Rea
 ## Dependencies
 
 ### Backend
+
 - paho-mqtt >= 2.0.0
 - firebase-admin >= 6.2.0
 - python-dotenv >= 1.0.0
 
 ### Frontend
+
 - React Native 0.81.5
 - Expo 54.0
 - Firebase 12.12.1
