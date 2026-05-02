@@ -1,11 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Text } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, useWindowDimensions } from 'react-native';
 import { Map } from '../components/Map';
 import { NodeDetail } from '../components/NodeDetail';
 import { SensorReading } from '../types';
 
 export const DashboardScreen: React.FC = () => {
   const [readings, setReadings] = useState<SensorReading[]>([]);
+  const { width } = useWindowDimensions();
+  
+  // PRD Breakpoints
+  const isMobile = width < 640;
+  const isTablet = width >= 640 && width < 1024;
+  const isDesktop = width >= 1024;
 
   // Dynamic dummy data for scaffolding
   useEffect(() => {
@@ -68,16 +74,18 @@ export const DashboardScreen: React.FC = () => {
   }));
 
   return (
-    <View style={styles.container}>
-      <View style={styles.mapContainer}>
+    <View style={[styles.container, { flexDirection: isMobile ? 'column' : 'row' }]}>
+      <View style={[styles.mapContainer, { flex: isMobile ? 1 : 0.6 }]}>
         <Map markers={mapMarkers} />
       </View>
-      <ScrollView style={styles.listContainer}>
-        {readings.length === 0 ? <Text style={styles.emptyText}>No data available</Text> : null}
-        {readings.map(r => (
-          <NodeDetail key={r.node_id} reading={r} />
-        ))}
-      </ScrollView>
+      <View style={[styles.sidebarContainer, { flex: isMobile ? 1 : 0.4 }]}>
+        <ScrollView style={styles.listContainer}>
+          {readings.length === 0 ? <Text style={styles.emptyText}>No data available</Text> : null}
+          {readings.map(r => (
+            <NodeDetail key={r.node_id} reading={r} />
+          ))}
+        </ScrollView>
+      </View>
     </View>
   );
 };
@@ -85,15 +93,18 @@ export const DashboardScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'column',
   },
   mapContainer: {
-    flex: 1,
     minHeight: 300,
+  },
+  sidebarContainer: {
+    backgroundColor: '#f5f5f5',
+    borderLeftWidth: 1,
+    borderLeftColor: '#e0e0e0',
   },
   listContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    padding: 10,
   },
   emptyText: {
     padding: 20,
