@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../services/useAuth';
+import { useAuth } from '../../services/useAuth';
 import { ArrowLeft, User, Lock, LogIn, Zap, Shield } from 'lucide-react';
-import { AlertToast } from './AlertToast';
+import { AlertToast } from '../../components/common/AlertToast';
 
 export default function LoginPage() {
     const navigate = useNavigate();

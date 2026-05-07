@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import AdminLayout from './AdminLayout';
+import AdminLayout from '../../components/admin/AdminLayout';
 import { ClipboardList, Filter, Search, User as UserIcon, Cpu, Sliders, Shield, AlertTriangle } from 'lucide-react';
 
 type ActionType = 'node_assigned' | 'user_created' | 'threshold_changed' | 'node_offline' | 'role_changed' | 'user_disabled';

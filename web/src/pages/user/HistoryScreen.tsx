@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAuth } from '../services/useAuth';
-import { getAllNodes, getReadingsHistory } from '../services/api';
-import { ChartSkeleton } from './LoadingSkeleton';
-import { AlertToast } from './AlertToast';
-import DashboardLayout from './DashboardLayout';
+import { useAuth } from '../../services/useAuth';
+import { getAllNodes, getReadingsHistory } from '../../services/api';
+import { ChartSkeleton } from '../../components/common/LoadingSkeleton';
+import { AlertToast } from '../../components/common/AlertToast';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   Chart as ChartJS,
   CategoryScale,

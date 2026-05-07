@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../services/useAuth';
-import { getAlerts, acknowledgeAlert } from '../services/api';
-import { LoadingSkeleton } from './LoadingSkeleton';
-import { AlertToast } from './AlertToast';
-import DashboardLayout from './DashboardLayout';
+import { useAuth } from '../../services/useAuth';
+import { getAlerts, acknowledgeAlert } from '../../services/api';
+import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { AlertToast } from '../../components/common/AlertToast';
+import DashboardLayout from '../../components/layout/DashboardLayout';
+import { SENSITIVE_CONDITIONS } from '../../constants/conditions';
 import { CheckCircle, AlertTriangle, Clock, Filter, BellRing, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -18,9 +19,6 @@ interface Alert {
   acknowledged_at: string | null;
   acknowledged_by: string | null;
 }
-
-// Conditions that lower the effective AQI threshold
-const SENSITIVE_CONDITIONS = ['Asthma', 'COPD', 'Elderly (60+)', 'Child (under 12)', 'Pregnant'];
 
 const DEMO_ALERTS: Alert[] = [
   {

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { useAuth } from '../services/useAuth';
-import { getLatestReadings, getAlerts } from '../services/api';
-import { Map } from './Map';
-import { AQIBadge } from './AQIBadge';
-import { LoadingSkeleton } from './LoadingSkeleton';
-import { AlertToast } from './AlertToast';
-import DashboardLayout from './DashboardLayout';
+import { useAuth } from '../../services/useAuth';
+import { getLatestReadings, getAlerts } from '../../services/api';
+import { Map } from '../../components/map/Map';
+import { AQIBadge } from '../../components/common/AQIBadge';
+import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { AlertToast } from '../../components/common/AlertToast';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Activity, Wind, Thermometer, Battery, AlertTriangle, Cpu } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAuth } from '../services/useAuth';
-import { getLatestReadings, getReadingsHistory, getForecast } from '../services/api';
-import { AQIBadge } from './AQIBadge';
-import { LoadingSkeleton } from './LoadingSkeleton';
-import { AlertToast } from './AlertToast';
-import DashboardLayout from './DashboardLayout';
+import { useAuth } from '../../services/useAuth';
+import { getLatestReadings, getReadingsHistory, getForecast } from '../../services/api';
+import { AQIBadge } from '../../components/common/AQIBadge';
+import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { AlertToast } from '../../components/common/AlertToast';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 import {
   Chart as ChartJS,
   CategoryScale,

@@ -1,4 +1,4 @@
-import AdminLayout from './AdminLayout';
+import AdminLayout from '../../components/admin/AdminLayout';
 import { BarChart2, TrendingUp, Wind, Thermometer, Activity } from 'lucide-react';
 
 const NODES = ['node1', 'node2', 'node3'];

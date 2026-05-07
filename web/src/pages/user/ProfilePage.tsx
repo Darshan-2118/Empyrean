@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../services/useAuth';
-import DashboardLayout from './DashboardLayout';
-import { AlertToast } from './AlertToast';
-import { ConditionSelector } from './ConditionSelector';
+import { useAuth } from '../../services/useAuth';
+import DashboardLayout from '../../components/layout/DashboardLayout';
+import { AlertToast } from '../../components/common/AlertToast';
+import { ConditionSelector } from '../../components/common/ConditionSelector';
 import { Camera, Save, Shield, Clock, Mail, User as UserIcon, Cpu, Heart } from 'lucide-react';
 
 // ── Image compression via canvas ──

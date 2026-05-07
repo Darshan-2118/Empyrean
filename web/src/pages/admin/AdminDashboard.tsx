@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import AdminLayout from './AdminLayout';
+import AdminLayout from '../../components/admin/AdminLayout';
 import { getLatestReadings, getAllNodes, getAlerts } from '../../services/api';
 import { useAuth } from '../../services/useAuth';
 import { Activity, Cpu, AlertTriangle, Users, Wifi, WifiOff, TrendingUp } from 'lucide-react';

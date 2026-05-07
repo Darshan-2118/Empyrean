@@ -1,27 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { X, ChevronDown, Search } from 'lucide-react';
-
-// ── Full condition list ───────────────────────────────────────────────────────
-const STANDARD_CONDITIONS = [
-  'Allergic Rhinitis',
-  'Asthma',
-  'Bronchiectasis',
-  'Chronic Bronchitis',
-  'COPD',
-  'Cystic Fibrosis',
-  'Emphysema',
-  'Hypersensitivity Pneumonitis',
-  'Pulmonary Fibrosis',
-  'Sleep Apnea',
-];
-
-// Pinned at bottom (vulnerability groups)
-const VULNERABILITY_GROUPS = [
-  'Child (under 12)',
-  'Elderly (60+)',
-  'Pregnant',
-];
+import { STANDARD_CONDITIONS, VULNERABILITY_GROUPS } from '../../constants/conditions';
 
 interface ConditionSelectorProps {
   selected: string[];
