@@ -45,6 +45,28 @@ A comprehensive IoT monitoring and management system with Python backend and Rea
    python app.py
    ```
 
+### Web Dashboard Setup
+
+1. **Navigate to the web folder:**
+   ```bash
+   cd web
+   ```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+3. **Configure environment:**
+   - Add your Firebase config to `.env` in the root directory.
+4. **Seed the database:**
+   ```bash
+   npm run seed
+   ```
+   *This populates Firestore with nodes and test accounts.*
+5. **Start the app:**
+   ```bash
+   npm run dev
+   ```
+
 ### Frontend Setup
 
 1. **Navigate to the frontend folder:**

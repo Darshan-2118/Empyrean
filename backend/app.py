@@ -18,7 +18,12 @@ load_dotenv()
 # Firebase Init
 # =============================================================================
 try:
-    cred = credentials.Certificate('serviceAccountKey.json')
+    firebase_sa = os.getenv('FIREBASE_SERVICE_ACCOUNT')
+    if firebase_sa:
+        cred_dict = json.loads(firebase_sa)
+        cred = credentials.Certificate(cred_dict)
+    else:
+        cred = credentials.Certificate('serviceAccountKey.json')
     firebase_admin.initialize_app(cred)
     db = firestore.client()
     print("✅ Firebase initialized")

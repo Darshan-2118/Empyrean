@@ -50,11 +50,12 @@ export const Map: React.FC<MapProps> = ({
 }) => {
   // Support both old markers API and new readings API
   const displayData = readings.length > 0 ? readings : markers;
-  const centerLat = displayData.length > 0 ? (displayData[0] as any).lat : center[0];
-  const centerLon = displayData.length > 0 ? (displayData[0] as any).lon : center[1];
+  const centerLat = displayData.length > 0 ? (displayData[0] as Reading).lat : center[0];
+  const centerLon = displayData.length > 0 ? (displayData[0] as Reading).lon : center[1];
 
   useEffect(() => {
     // Fix for leaflet marker icons
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (L.Icon.Default.prototype as any)._getIconUrl;
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
