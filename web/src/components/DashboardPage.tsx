@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../services/useAuth';
 import { getLatestReadings, getAlerts } from '../services/api';
 import { Map } from './Map';
 import { AQIBadge } from './AQIBadge';
 import { LoadingSkeleton } from './LoadingSkeleton';
 import { AlertToast } from './AlertToast';
-import { Activity, Wind, Thermometer, Droplets, Battery, Bell, LogOut, LayoutDashboard, History as HistoryIcon, Settings, AlertTriangle, Users } from 'lucide-react';
+import DashboardLayout from './DashboardLayout';
+import { Activity, Wind, Thermometer, Battery, AlertTriangle, Cpu } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface SensorReading {
   node_id: string;
@@ -40,286 +42,256 @@ interface Alert {
   acknowledged_by: string | null;
 }
 
+// Demo readings keyed by node_id
+const DEMO_READINGS: Record<string, SensorReading> = {
+  'node1': {
+    node_id: 'node1', lat: 12.88705, lon: 77.450153,
+    temperature: 31.2, humidity: 45, pressure: 1012.5, voc_ohm: 45000,
+    mq135_ppm: 320, pm1: 12.5, pm25: 34.7, pm10: 45.2,
+    fuzzy_score: 95, aqi: 98, aqi_category: 'Moderate',
+    battery_v: 3.82, timestamp: new Date().toISOString(),
+  },
+  'node2': {
+    node_id: 'node2', lat: 12.8767, lon: 77.4475,
+    temperature: 29.8, humidity: 55, pressure: 1013.2, voc_ohm: 48000,
+    mq135_ppm: 280, pm1: 8.4, pm25: 22.4, pm10: 30.1,
+    fuzzy_score: 98, aqi: 68, aqi_category: 'Moderate',
+    battery_v: 3.71, timestamp: new Date().toISOString(),
+  },
+  'node3': {
+    node_id: 'node3', lat: 12.896255, lon: 77.461852,
+    temperature: 33.5, humidity: 70, pressure: 1011.8, voc_ohm: 38000,
+    mq135_ppm: 450, pm1: 28.9, pm25: 58.3, pm10: 78.4,
+    fuzzy_score: 88, aqi: 153, aqi_category: 'Unhealthy for Sensitive Groups',
+    battery_v: 3.61, timestamp: new Date().toISOString(),
+  },
+};
+
+const DEMO_ALERTS: Alert[] = [
+  {
+    alert_id: 'demo-alert-1', node_id: 'node3', parameter: 'pm25',
+    value: 58.3, threshold: 55.4, severity: 'warning',
+    triggered_at: new Date().toISOString(), acknowledged_at: null, acknowledged_by: null,
+  },
+  {
+    alert_id: 'demo-alert-2', node_id: 'node3', parameter: 'aqi',
+    value: 153, threshold: 150, severity: 'critical',
+    triggered_at: new Date().toISOString(), acknowledged_at: null, acknowledged_by: null,
+  },
+];
+
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { token, logout, user } = useAuth();
+  const { token, user } = useAuth();
+  const isDemo = token?.startsWith('demo-token');
+  
+  // The user's assigned node — from auth context (set by admin or demo seed)
+  const assignedNode = user?.assignedNode || 'node1';
 
-  const [readings, setReadings] = useState<SensorReading[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Health conditions from auth context or localStorage
+  const healthConditions = user?.healthConditions ?? 
+    JSON.parse(localStorage.getItem('empyrean_health_conditions') || '[]');
+  const hasSensitiveCondition = healthConditions.some((c: string) =>
+    ['Asthma', 'COPD', 'Elderly (60+)', 'Child (under 12)', 'Pregnant'].includes(c)
+  );
+
+  // Filter demo data to only the assigned node
+  const demoReading = DEMO_READINGS[assignedNode] || DEMO_READINGS['node1'];
+  const demoAlerts = DEMO_ALERTS.filter(a => a.node_id === assignedNode);
+
+  const [reading, setReading] = useState<SensorReading | null>(isDemo ? demoReading : null);
+  const [alerts, setAlerts] = useState<Alert[]>(isDemo ? demoAlerts : []);
+  const [loading, setLoading] = useState(!isDemo);
   const [error, setError] = useState<string | null>(null);
 
-  // Load readings and alerts
   useEffect(() => {
+    if (isDemo) return;
     const loadData = async () => {
       if (!token) return;
-
       try {
         setLoading(true);
-        
-        // Load latest readings
-        const readingsResponse = await getLatestReadings(token);
+        // Fetch only the assigned node's reading
+        const readingsResponse = await getLatestReadings(token, assignedNode);
         const readingsList = Array.isArray(readingsResponse) ? readingsResponse : [readingsResponse];
-        setReadings(readingsList);
+        const nodeReading = readingsList.find((r: SensorReading) => r.node_id === assignedNode) || readingsList[0];
+        setReading(nodeReading || null);
 
-        // Load unacknowledged alerts
-        const alertsResponse = await getAlerts(token, 10);
+        const alertsResponse = await getAlerts(token, 20);
         const alertsList = Array.isArray(alertsResponse) ? alertsResponse : [];
-        setAlerts(alertsList.filter(a => !a.acknowledged_at));
-
+        // Only show alerts for this user's node
+        setAlerts(alertsList.filter((a: Alert) => !a.acknowledged_at && a.node_id === assignedNode));
         setError(null);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load data');
       } finally {
         setLoading(false);
       }
     };
-
     loadData();
-    // Poll every 5 seconds
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
-  }, [token]);
+  }, [token, isDemo, assignedNode]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const handleNodeClick = (nodeId: string) => {
-    navigate(`/dashboard/node/${nodeId}`);
-  };
-
-  const avgAqi = readings.length ? Math.round(readings.reduce((acc, r) => acc + r.aqi, 0) / readings.length) : 0;
-  const avgTemp = readings.length ? (readings.reduce((acc, r) => acc + r.temperature, 0) / readings.length).toFixed(1) : 0;
-  const onlineNodes = readings.length;
+  const showHealthWarning = hasSensitiveCondition && (reading?.aqi ?? 0) >= 51;
 
   return (
-    <div className="relative min-h-screen w-full bg-black text-white font-sans overflow-hidden flex">
-      
-      {/* Background Video (Static) */}
-      <video
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover z-0 opacity-40"
-        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260315_073750_51473149-4350-4920-ae24-c8214286f323.mp4#t=0.1"
-      />
+    <DashboardLayout title="My Dashboard" alertCount={alerts.length}>
+      <div className="flex flex-col gap-6">
+        {error && <AlertToast type="error" message={error} />}
 
-      {/* Sidebar */}
-      <aside className="relative z-10 w-64 liquid-glass-strong border-r border-white/10 flex flex-col justify-between py-8 px-4 h-screen backdrop-blur-2xl">
-        <div>
-          <div className="flex items-center gap-3 px-4 mb-10">
-            <img src="/finallogo.png" alt="Logo" className="w-8 h-8 object-contain" />
-            <span className="text-xl font-semibold tracking-wide">EMPYREAN</span>
+        {/* Assigned Node Banner */}
+        <div className="flex items-center gap-3 px-5 py-3.5 bg-blue-500/8 border border-blue-500/20 rounded-2xl">
+          <Cpu className="w-4 h-4 text-blue-400 shrink-0" />
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-300/50">Your Assigned Node</p>
+            <p className="text-sm font-bold text-blue-200">{assignedNode}</p>
           </div>
-
-          <nav className="flex flex-col gap-2">
-            <button 
-              onClick={() => navigate('/dashboard')} 
-              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/20 text-white shadow-inner transition-all"
-            >
-              <LayoutDashboard className="w-5 h-5" />
-              <span className="font-medium">Dashboard</span>
-            </button>
-            <button 
-              onClick={() => navigate('/dashboard/history')} 
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
-            >
-              <HistoryIcon className="w-5 h-5" />
-              <span className="font-medium">History</span>
-            </button>
-            <button 
-              onClick={() => navigate('/dashboard/alerts')} 
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all relative"
-            >
-              <Bell className="w-5 h-5" />
-              <span className="font-medium">Alerts</span>
-              {alerts.length > 0 && (
-                <span className="absolute right-4 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              )}
-            </button>
-            
-            {user?.role === 'admin' && (
-              <>
-                <hr className="my-2 border-white/10" />
-                <button 
-                  onClick={() => navigate('/admin/nodes')} 
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
-                >
-                  <Users className="w-5 h-5" />
-                  <span className="font-medium">Nodes</span>
-                </button>
-                <button 
-                  onClick={() => navigate('/admin/settings')} 
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
-                >
-                  <Settings className="w-5 h-5" />
-                  <span className="font-medium">Settings</span>
-                </button>
-              </>
-            )}
-          </nav>
+          {reading && (
+            <div className="ml-auto">
+              <span className={`w-2 h-2 rounded-full inline-block animate-pulse mr-1.5 ${
+                reading.aqi <= 50 ? 'bg-green-400' :
+                reading.aqi <= 100 ? 'bg-yellow-400' :
+                reading.aqi <= 150 ? 'bg-orange-400' : 'bg-red-500'
+              }`} />
+              <span className="text-xs text-white/50">Live</span>
+            </div>
+          )}
         </div>
 
-        <button 
-          onClick={handleLogout} 
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-red-400 hover:bg-red-400/10 transition-all"
-        >
-          <LogOut className="w-5 h-5" />
-          <span className="font-medium">Logout</span>
-        </button>
-      </aside>
+        {/* Health Warning Banner */}
+        {showHealthWarning && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="liquid-glass rounded-xl p-4 border border-yellow-500/30 bg-yellow-500/10 flex items-center gap-4 shadow-lg shadow-yellow-500/5"
+          >
+            <AlertTriangle className="w-6 h-6 text-yellow-400 shrink-0" />
+            <div>
+              <p className="font-bold text-yellow-200">Personalized Health Advisory</p>
+              <p className="text-sm text-yellow-100/70">
+                Current AQI is {reading?.aqi} ({reading?.aqi_category}). Due to your health conditions, consider reducing prolonged outdoor exertion.
+              </p>
+            </div>
+          </motion.div>
+        )}
 
-      {/* Main Content Area */}
-      <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Topbar */}
-        <header className="w-full h-20 liquid-glass border-b border-white/5 flex items-center justify-between px-8 backdrop-blur-xl shrink-0">
-          <h1 className="text-2xl font-semibold">Live Dashboard</h1>
-          
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center border border-white/20 shadow-lg">
-            <span className="font-semibold text-sm">{user?.username?.[0]?.toUpperCase() || 'U'}</span>
+        {/* Overview Stats */}
+        {reading && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard icon={Activity} label="AQI" value={reading.aqi} color="text-teal-400" />
+            <StatCard icon={Wind} label="PM2.5" value={`${reading.pm25.toFixed(1)} µg`} color="text-purple-400" />
+            <StatCard icon={Thermometer} label="Temperature" value={`${reading.temperature.toFixed(1)}°C`} color="text-orange-400" />
+            <StatCard icon={AlertTriangle} label="Active Alerts" value={alerts.length} color="text-red-400" />
           </div>
-        </header>
+        )}
 
-        {/* Dashboard View */}
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-          <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-            
-            {error && <AlertToast type="error" message={error} />}
+        <h2 className="text-xl font-semibold mt-2 border-b border-white/10 pb-2">Live Sensor Data</h2>
 
-            {/* Overview Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
-                  <Activity className="w-4 h-4 text-blue-400" /> Active Nodes
-                </div>
-                <span className="text-3xl font-bold">{onlineNodes}</span>
-              </div>
-              <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
-                  <Wind className="w-4 h-4 text-teal-400" /> Avg AQI
-                </div>
-                <span className="text-3xl font-bold">{avgAqi}</span>
-              </div>
-              <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
-                  <Thermometer className="w-4 h-4 text-orange-400" /> Avg Temp
-                </div>
-                <span className="text-3xl font-bold">{avgTemp}°C</span>
-              </div>
-              <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
-                  <AlertTriangle className="w-4 h-4 text-red-400" /> Active Alerts
-                </div>
-                <span className="text-3xl font-bold">{alerts.length}</span>
-              </div>
+        {loading ? (
+          <LoadingSkeleton />
+        ) : !reading ? (
+          <div className="text-center py-16 text-white/40">
+            <Cpu className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>No readings available for {assignedNode}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="h-[480px] rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
+              <Map readings={[reading]} onMarkerClick={() => navigate(`/dashboard/node/${reading.node_id}`)} />
             </div>
 
-            <h2 className="text-xl font-semibold mt-4 border-b border-white/10 pb-2">Live Sensor Network</h2>
-
-            {/* Map & Node List */}
-            {loading ? (
-              <LoadingSkeleton />
-            ) : (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {/* Map */}
-                <div className="h-full min-h-[500px]">
-                  <Map 
-                    readings={readings}
-                    onMarkerClick={(reading) => handleNodeClick(reading.node_id)}
-                  />
-                </div>
-
-                {/* Node Cards */}
-                <div className="grid grid-cols-1 gap-4 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
-                  <AnimatePresence>
-                    {readings.length === 0 ? (
-                      <div className="col-span-1 text-center py-12 text-white/60">
-                        No sensor readings available
-                      </div>
-                    ) : (
-                      readings.map((reading) => (
-                        <motion.div 
-                          key={reading.node_id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          className="liquid-glass rounded-3xl p-6 relative overflow-hidden group cursor-pointer hover:bg-white/10 transition-all"
-                          onClick={() => handleNodeClick(reading.node_id)}
-                        >
-                          <div className="flex justify-between items-start mb-4">
-                            <div>
-                              <h3 className="text-lg font-bold flex items-center gap-2">
-                                {reading.node_id}
-                                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                              </h3>
-                              <p className="text-white/50 text-xs mt-1">
-                                {reading.lat.toFixed(4)}, {reading.lon.toFixed(4)}
-                              </p>
-                            </div>
-                            <AQIBadge aqi={reading.aqi} category={reading.aqi_category} size="sm" />
-                          </div>
-
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                            <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
-                              <span className="text-white/50 text-xs flex items-center gap-1"><Wind className="w-3 h-3" /> PM2.5</span>
-                              <span className="font-semibold">{reading.pm25.toFixed(0)}</span>
-                            </div>
-                            <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
-                              <span className="text-white/50 text-xs flex items-center gap-1"><Thermometer className="w-3 h-3" /> Temp</span>
-                              <span className="font-semibold">{reading.temperature.toFixed(1)}°C</span>
-                            </div>
-                            <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
-                              <span className="text-white/50 text-xs flex items-center gap-1"><Droplets className="w-3 h-3" /> Humid</span>
-                              <span className="font-semibold">{reading.humidity.toFixed(0)}%</span>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-between items-center text-xs text-white/40 mt-4 pt-3 border-t border-white/5">
-                            <span className="flex items-center gap-1"><Battery className="w-3 h-3" /> {reading.battery_v.toFixed(2)}V</span>
-                            <span>{new Date(reading.timestamp).toLocaleTimeString()}</span>
-                          </div>
-                        </motion.div>
-                      ))
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            )}
-
-            {/* Recent Alerts */}
-            {alerts.length > 0 && (
-              <>
-                <h2 className="text-xl font-semibold mt-8 border-b border-white/10 pb-2">Recent Alerts</h2>
-                <div className="grid grid-cols-1 gap-3">
-                  {alerts.slice(0, 5).map(alert => (
-                    <div 
-                      key={alert.alert_id} 
-                      className={`liquid-glass rounded-2xl p-4 border-l-4 ${
-                        alert.severity === 'critical' ? 'border-l-red-500' : 'border-l-yellow-500'
-                      } flex justify-between items-center`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <AlertTriangle className={`w-5 h-5 mt-0.5 ${alert.severity === 'critical' ? 'text-red-400' : 'text-yellow-400'}`} />
-                        <div>
-                          <p className="font-semibold text-sm">{alert.node_id} - {alert.parameter.toUpperCase()} Alert</p>
-                          <p className="text-white/60 text-xs">Value: {alert.value.toFixed(1)} (Threshold: {alert.threshold.toFixed(1)})</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => navigate('/dashboard/alerts')}
-                        className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs font-medium transition-all"
-                      >
-                        View
-                      </button>
+            <div className="flex flex-col gap-4">
+              <AnimatePresence>
+                <motion.div
+                  key={reading.node_id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="liquid-glass rounded-2xl p-6 border border-white/5 hover:border-white/15 transition-all cursor-pointer"
+                  onClick={() => navigate(`/dashboard/node/${reading.node_id}`)}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-lg">{reading.node_id}</h3>
+                      <span className={`w-2 h-2 rounded-full animate-pulse ${
+                        reading.aqi <= 50 ? 'bg-green-400' :
+                        reading.aqi <= 100 ? 'bg-yellow-400' :
+                        reading.aqi <= 150 ? 'bg-orange-400' :
+                        'bg-red-500'
+                      }`} />
                     </div>
-                  ))}
+                    <AQIBadge aqi={reading.aqi} category={reading.aqi_category} size="sm" />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <DetailStat label="PM1.0" value={`${reading.pm1.toFixed(0)} µg`} />
+                    <DetailStat label="PM2.5" value={`${reading.pm25.toFixed(0)} µg`} />
+                    <DetailStat label="PM10" value={`${reading.pm10.toFixed(0)} µg`} />
+                    <DetailStat label="Temperature" value={`${reading.temperature.toFixed(1)}°C`} />
+                    <DetailStat label="Humidity" value={`${reading.humidity.toFixed(0)}%`} />
+                    <DetailStat label="Pressure" value={`${reading.pressure.toFixed(0)} hPa`} />
+                    <DetailStat label="VOC" value={`${(reading.voc_ohm / 1000).toFixed(0)}kΩ`} />
+                    <DetailStat label="MQ-135" value={`${reading.mq135_ppm.toFixed(0)} ppm`} />
+                    <DetailStat label="Fuzzy Score" value={reading.fuzzy_score.toFixed(0)} />
+                  </div>
+
+                  <div className="flex justify-between items-center text-[10px] text-white/30 pt-3 border-t border-white/5">
+                    <span className="flex items-center gap-1"><Battery className="w-3 h-3" /> {reading.battery_v.toFixed(2)}V</span>
+                    <span>Updated {new Date(reading.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Active Alerts */}
+              {alerts.length > 0 && (
+                <div className="liquid-glass rounded-2xl p-5 border border-red-500/20 bg-red-500/5">
+                  <h4 className="font-bold text-sm text-red-300 mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Active Alerts for {assignedNode}
+                  </h4>
+                  <div className="space-y-2">
+                    {alerts.slice(0, 5).map(alert => (
+                      <div key={alert.alert_id} className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${
+                        alert.severity === 'critical' ? 'bg-red-500/15 text-red-200' : 'bg-yellow-500/15 text-yellow-200'
+                      }`}>
+                        <span className="font-bold uppercase">{alert.parameter}</span>
+                        <span>{alert.value.toFixed(1)} {'>'} {alert.threshold}</span>
+                        <span className="uppercase font-black tracking-wider text-[9px] opacity-70">{alert.severity}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      </main>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
+
+interface StatCardProps {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  color: string;
+}
+
+function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
+  return (
+    <div className="liquid-glass rounded-2xl p-5 flex flex-col gap-2 border border-white/5">
+      <div className="flex items-center gap-2 text-white/60 text-xs font-medium uppercase tracking-wider">
+        <Icon className={`w-4 h-4 ${color}`} /> {label}
+      </div>
+      <span className="text-3xl font-bold tracking-tight">{value}</span>
+    </div>
+  );
+}
+
+function DetailStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-black/20 rounded-lg p-2.5 border border-white/5">
+      <p className="text-white/40 text-[10px] uppercase font-bold tracking-tighter">{label}</p>
+      <p className="font-semibold text-sm mt-0.5">{value}</p>
     </div>
   );
 }
