@@ -1,27 +1,26 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../services/useAuth';
 import { ArrowLeft, User, Lock, LogIn } from 'lucide-react';
+import { AlertToast } from './AlertToast';
 
 export default function LoginPage() {
     const navigate = useNavigate();
+    const { login, isLoading } = useAuth();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Mock authentication check
-        if (!username || !password) {
-            setError('Please enter both username and password.');
-            return;
+        try {
+            setError('');
+            await login(username, password);
+            navigate('/dashboard');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Login failed';
+            setError(message);
         }
-        if (username !== 'admin' || password !== 'password') {
-            setError('Invalid username or password.');
-            return;
-        }
-        
-        setError('');
-        navigate('/dashboard');
     };
 
     return (
@@ -60,9 +59,7 @@ export default function LoginPage() {
 
                     <form onSubmit={handleLogin} className="flex flex-col gap-5">
                         {error && (
-                            <div className="bg-red-500/20 border border-red-500/50 text-red-200 text-sm px-4 py-3 rounded-xl backdrop-blur-md">
-                                {error}
-                            </div>
+                            <AlertToast type="error" message={error} />
                         )}
 
                         <div className="flex flex-col gap-1.5">
@@ -75,7 +72,8 @@ export default function LoginPage() {
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/30 transition-all"
+                                    disabled={isLoading}
+                                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/30 transition-all disabled:opacity-50"
                                     placeholder="Enter your username"
                                 />
                             </div>
@@ -94,31 +92,50 @@ export default function LoginPage() {
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/30 transition-all"
+                                    disabled={isLoading}
+                                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-11 pr-4 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/30 transition-all disabled:opacity-50"
                                     placeholder="Enter your password"
                                 />
                             </div>
                         </div>
 
-                        <button 
-                            type="submit" 
-                            className="mt-4 liquid-glass-strong w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform text-white font-medium"
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 text-white font-semibold py-3 rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95 mt-4"
                         >
-                            <span>Login to Dashboard</span>
-                            <LogIn className="w-4 h-4" />
+                            <LogIn className="w-5 h-5" />
+                            {isLoading ? 'Signing in...' : 'Sign In'}
                         </button>
-                    </form>
 
-                    <div className="mt-8 text-center">
-                        <p className="text-sm text-white/60">
-                            Don't have an account?{' '}
-                            <button onClick={() => navigate('/create-account')} className="text-white hover:text-white/80 font-medium transition-colors border-b border-white/20 pb-0.5 hover:border-white/60">
-                                Create an account
+                        <div className="flex items-center justify-center gap-3">
+                            <p className="text-white/60 text-sm">
+                                Don't have an account?{' '}
+                                <a href="/create-account" className="text-white hover:text-purple-400 transition-colors font-medium">
+                                    Sign up
+                                </a>
+                            </p>
+                            <span className="text-white/20">|</span>
+                            <button
+                                type="button"
+                                disabled={isLoading}
+                                onClick={async () => {
+                                    try {
+                                        setError('');
+                                        await login('admin', 'admin');
+                                        navigate('/dashboard');
+                                    } catch (err: unknown) {
+                                        const message = err instanceof Error ? err.message : 'Quick login failed';
+                                        setError(message);
+                                    }
+                                }}
+                                className="text-sm font-medium px-3 py-1 rounded-full border border-white/15 bg-white/5 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/25 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                                user1
                             </button>
-                        </p>
-                    </div>
+                        </div>
+                    </form>
                 </div>
-
             </div>
         </div>
     );

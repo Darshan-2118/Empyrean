@@ -1,7 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Wind, Thermometer, Droplets, Battery, MapPin, Search, Bell, LogOut, LayoutDashboard, History, Settings } from 'lucide-react';
+import { useAuth } from '../services/useAuth';
+import { getLatestReadings, getAlerts } from '../services/api';
+import { Map } from './Map';
+import { AQIBadge } from './AQIBadge';
+import { LoadingSkeleton } from './LoadingSkeleton';
+import { AlertToast } from './AlertToast';
+import { Activity, Wind, Thermometer, Droplets, Battery, Bell, LogOut, LayoutDashboard, History as HistoryIcon, Settings, AlertTriangle, Users } from 'lucide-react';
 
 interface SensorReading {
   node_id: string;
@@ -22,234 +28,298 @@ interface SensorReading {
   timestamp: string;
 }
 
+interface Alert {
+  alert_id: string;
+  node_id: string;
+  parameter: string;
+  value: number;
+  threshold: number;
+  severity: string;
+  triggered_at: string;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+}
+
 export default function DashboardPage() {
-    const navigate = useNavigate();
-    const [readings, setReadings] = useState<SensorReading[]>([]);
-    const [activeTab, setActiveTab] = useState('dashboard');
+  const navigate = useNavigate();
+  const { token, logout, user } = useAuth();
 
-    useEffect(() => {
-        const generateData = (): SensorReading[] => {
-            const baseLat = 12.9716;
-            const baseLon = 77.5946;
-            return Array.from({ length: 4 }).map((_, i) => {
-                const pm25 = Math.floor(Math.random() * 200);
-                let aqi_cat = "Good";
-                if (pm25 > 50) aqi_cat = "Moderate";
-                if (pm25 > 100) aqi_cat = "Unhealthy";
-                if (pm25 > 150) aqi_cat = "Hazardous";
+  const [readings, setReadings] = useState<SensorReading[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-                return {
-                    node_id: `ESP32-0${i + 1}`,
-                    lat: baseLat + (Math.random() - 0.5) * 0.05,
-                    lon: baseLon + (Math.random() - 0.5) * 0.05,
-                    temperature: +(30 + Math.random() * 5).toFixed(1),
-                    humidity: +(60 + Math.random() * 20).toFixed(1),
-                    pressure: 1013,
-                    voc_ohm: Math.floor(40000 + Math.random() * 10000),
-                    mq135_ppm: Math.floor(300 + Math.random() * 200),
-                    pm1: Math.floor(pm25 * 0.5),
-                    pm25: pm25,
-                    pm10: Math.floor(pm25 * 1.5),
-                    fuzzy_score: pm25,
-                    aqi: pm25,
-                    aqi_category: aqi_cat,
-                    battery_v: +(3.5 + Math.random() * 0.7).toFixed(2),
-                    timestamp: new Date().toISOString()
-                };
-            });
-        };
+  // Load readings and alerts
+  useEffect(() => {
+    const loadData = async () => {
+      if (!token) return;
 
-        setReadings(generateData());
-        const interval = setInterval(() => {
-            setReadings(generateData());
-        }, 5000);
+      try {
+        setLoading(true);
+        
+        // Load latest readings
+        const readingsResponse = await getLatestReadings(token);
+        const readingsList = Array.isArray(readingsResponse) ? readingsResponse : [readingsResponse];
+        setReadings(readingsList);
 
-        return () => clearInterval(interval);
-    }, []);
+        // Load unacknowledged alerts
+        const alertsResponse = await getAlerts(token, 10);
+        const alertsList = Array.isArray(alertsResponse) ? alertsResponse : [];
+        setAlerts(alertsList.filter(a => !a.acknowledged_at));
 
-    const getAqiColorClass = (aqi: number) => {
-        if (aqi <= 50) return 'text-green-400 border-green-400/50 bg-green-400/10';
-        if (aqi <= 100) return 'text-yellow-400 border-yellow-400/50 bg-yellow-400/10';
-        if (aqi <= 150) return 'text-orange-400 border-orange-400/50 bg-orange-400/10';
-        if (aqi <= 200) return 'text-red-400 border-red-400/50 bg-red-400/10';
-        if (aqi <= 300) return 'text-purple-400 border-purple-400/50 bg-purple-400/10';
-        return 'text-rose-600 border-rose-600/50 bg-rose-600/10';
+        setError(null);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const handleLogout = () => {
-        navigate('/login');
-    };
+    loadData();
+    // Poll every 5 seconds
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
+  }, [token]);
 
-    return (
-        <div className="relative min-h-screen w-full bg-black text-white font-sans overflow-hidden flex">
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const handleNodeClick = (nodeId: string) => {
+    navigate(`/dashboard/node/${nodeId}`);
+  };
+
+  const avgAqi = readings.length ? Math.round(readings.reduce((acc, r) => acc + r.aqi, 0) / readings.length) : 0;
+  const avgTemp = readings.length ? (readings.reduce((acc, r) => acc + r.temperature, 0) / readings.length).toFixed(1) : 0;
+  const onlineNodes = readings.length;
+
+  return (
+    <div className="relative min-h-screen w-full bg-black text-white font-sans overflow-hidden flex">
+      
+      {/* Background Video (Static) */}
+      <video
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover z-0 opacity-40"
+        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260315_073750_51473149-4350-4920-ae24-c8214286f323.mp4#t=0.1"
+      />
+
+      {/* Sidebar */}
+      <aside className="relative z-10 w-64 liquid-glass-strong border-r border-white/10 flex flex-col justify-between py-8 px-4 h-screen backdrop-blur-2xl">
+        <div>
+          <div className="flex items-center gap-3 px-4 mb-10">
+            <img src="/finallogo.png" alt="Logo" className="w-8 h-8 object-contain" />
+            <span className="text-xl font-semibold tracking-wide">EMPYREAN</span>
+          </div>
+
+          <nav className="flex flex-col gap-2">
+            <button 
+              onClick={() => navigate('/dashboard')} 
+              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/20 text-white shadow-inner transition-all"
+            >
+              <LayoutDashboard className="w-5 h-5" />
+              <span className="font-medium">Dashboard</span>
+            </button>
+            <button 
+              onClick={() => navigate('/dashboard/history')} 
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <HistoryIcon className="w-5 h-5" />
+              <span className="font-medium">History</span>
+            </button>
+            <button 
+              onClick={() => navigate('/dashboard/alerts')} 
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all relative"
+            >
+              <Bell className="w-5 h-5" />
+              <span className="font-medium">Alerts</span>
+              {alerts.length > 0 && (
+                <span className="absolute right-4 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              )}
+            </button>
             
-            {/* Background Video (Static) */}
-            <video
-                muted
-                playsInline
-                className="absolute inset-0 w-full h-full object-cover z-0 opacity-40"
-                src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260315_073750_51473149-4350-4920-ae24-c8214286f323.mp4#t=0.1"
-            />
-
-            {/* Sidebar Overlay */}
-            <aside className="relative z-10 w-64 liquid-glass-strong border-r border-white/10 flex flex-col justify-between py-8 px-4 h-screen backdrop-blur-2xl">
-                <div>
-                    <div className="flex items-center gap-3 px-4 mb-10">
-                        <img src="/finallogo.png" alt="Logo" className="w-8 h-8 object-contain" />
-                        <span className="text-xl font-semibold tracking-wide">EMPYREAN</span>
-                    </div>
-
-                    <nav className="flex flex-col gap-2">
-                        <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-white/20 text-white shadow-inner' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
-                            <LayoutDashboard className="w-5 h-5" />
-                            <span className="font-medium">Dashboard</span>
-                        </button>
-                        <button onClick={() => setActiveTab('history')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'history' ? 'bg-white/20 text-white shadow-inner' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
-                            <History className="w-5 h-5" />
-                            <span className="font-medium">History</span>
-                        </button>
-                        <button onClick={() => setActiveTab('alerts')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'alerts' ? 'bg-white/20 text-white shadow-inner' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
-                            <Bell className="w-5 h-5" />
-                            <span className="font-medium">Alerts</span>
-                        </button>
-                        <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white/20 text-white shadow-inner' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
-                            <Settings className="w-5 h-5" />
-                            <span className="font-medium">Settings</span>
-                        </button>
-                    </nav>
-                </div>
-
-                <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-red-400 hover:bg-red-400/10 transition-all mt-auto">
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-medium">Logout</span>
+            {user?.role === 'admin' && (
+              <>
+                <hr className="my-2 border-white/10" />
+                <button 
+                  onClick={() => navigate('/admin/nodes')} 
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                >
+                  <Users className="w-5 h-5" />
+                  <span className="font-medium">Nodes</span>
                 </button>
-            </aside>
-
-            {/* Main Content Area */}
-            <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
-                {/* Topbar */}
-                <header className="w-full h-20 liquid-glass border-b border-white/5 flex items-center justify-between px-8 backdrop-blur-xl shrink-0">
-                    <h1 className="text-2xl font-semibold capitalize">{activeTab}</h1>
-                    
-                    <div className="flex items-center gap-4">
-                        <div className="relative hidden md:block">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
-                            <input 
-                                type="text" 
-                                placeholder="Search nodes..." 
-                                className="bg-black/30 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 w-64 transition-all placeholder:text-white/30"
-                            />
-                        </div>
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center border border-white/20 shadow-lg">
-                            <span className="font-semibold text-sm">VD</span>
-                        </div>
-                    </div>
-                </header>
-
-                {/* Dashboard View */}
-                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                    {activeTab === 'dashboard' && (
-                        <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-                            
-                            {/* Overview Stats */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
-                                    <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
-                                        <Activity className="w-4 h-4 text-blue-400" /> Active Nodes
-                                    </div>
-                                    <span className="text-3xl font-bold">{readings.length}</span>
-                                </div>
-                                <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
-                                    <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
-                                        <Wind className="w-4 h-4 text-teal-400" /> Avg AQI
-                                    </div>
-                                    <span className="text-3xl font-bold">
-                                        {readings.length ? Math.round(readings.reduce((acc, r) => acc + r.aqi, 0) / readings.length) : 0}
-                                    </span>
-                                </div>
-                                <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
-                                    <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
-                                        <Thermometer className="w-4 h-4 text-orange-400" /> Avg Temp
-                                    </div>
-                                    <span className="text-3xl font-bold">
-                                        {readings.length ? (readings.reduce((acc, r) => acc + r.temperature, 0) / readings.length).toFixed(1) : 0}°C
-                                    </span>
-                                </div>
-                                <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
-                                    <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
-                                        <MapPin className="w-4 h-4 text-purple-400" /> Area Coverage
-                                    </div>
-                                    <span className="text-3xl font-bold">12 km²</span>
-                                </div>
-                            </div>
-
-                            <h2 className="text-xl font-semibold mt-4 border-b border-white/10 pb-2">Live Node Status</h2>
-
-                            {/* Node Grid */}
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                                <AnimatePresence>
-                                    {readings.map((reading) => (
-                                        <motion.div 
-                                            key={reading.node_id}
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            className="liquid-glass rounded-3xl p-6 relative overflow-hidden group"
-                                        >
-                                            <div className="flex justify-between items-start mb-6">
-                                                <div>
-                                                    <h3 className="text-lg font-bold flex items-center gap-2">
-                                                        {reading.node_id}
-                                                        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                                    </h3>
-                                                    <p className="text-white/50 text-xs mt-1">Lat: {reading.lat.toFixed(4)}, Lon: {reading.lon.toFixed(4)}</p>
-                                                </div>
-                                                <div className={`px-4 py-1.5 rounded-full border text-sm font-bold flex items-center gap-2 ${getAqiColorClass(reading.aqi)}`}>
-                                                    AQI: {reading.aqi} <span className="text-xs font-medium uppercase opacity-80">({reading.aqi_category})</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                                                <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
-                                                    <span className="text-white/50 text-xs flex items-center gap-1"><Wind className="w-3 h-3" /> PM2.5</span>
-                                                    <span className="font-semibold">{reading.pm25} <span className="text-xs font-normal opacity-50">µg/m³</span></span>
-                                                </div>
-                                                <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
-                                                    <span className="text-white/50 text-xs flex items-center gap-1"><Wind className="w-3 h-3" /> PM10</span>
-                                                    <span className="font-semibold">{reading.pm10} <span className="text-xs font-normal opacity-50">µg/m³</span></span>
-                                                </div>
-                                                <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
-                                                    <span className="text-white/50 text-xs flex items-center gap-1"><Thermometer className="w-3 h-3" /> Temp</span>
-                                                    <span className="font-semibold">{reading.temperature}°C</span>
-                                                </div>
-                                                <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
-                                                    <span className="text-white/50 text-xs flex items-center gap-1"><Droplets className="w-3 h-3" /> Humidity</span>
-                                                    <span className="font-semibold">{reading.humidity}%</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex justify-between items-center text-xs text-white/40 mt-6 pt-4 border-t border-white/5">
-                                                <div className="flex items-center gap-4">
-                                                    <span className="flex items-center gap-1"><Battery className="w-3 h-3" /> {reading.battery_v}V</span>
-                                                    <span>VOC: {reading.voc_ohm}Ω</span>
-                                                </div>
-                                                <span>Updated: {new Date(reading.timestamp).toLocaleTimeString()}</span>
-                                            </div>
-                                        </motion.div>
-                                    ))}
-                                </AnimatePresence>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab !== 'dashboard' && (
-                        <div className="flex flex-col items-center justify-center h-full text-white/50">
-                            <h2 className="text-2xl font-medium mb-2 capitalize">{activeTab}</h2>
-                            <p>This module is under construction.</p>
-                        </div>
-                    )}
-                </div>
-            </main>
+                <button 
+                  onClick={() => navigate('/admin/settings')} 
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="font-medium">Settings</span>
+                </button>
+              </>
+            )}
+          </nav>
         </div>
-    );
+
+        <button 
+          onClick={handleLogout} 
+          className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-red-400 hover:bg-red-400/10 transition-all"
+        >
+          <LogOut className="w-5 h-5" />
+          <span className="font-medium">Logout</span>
+        </button>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Topbar */}
+        <header className="w-full h-20 liquid-glass border-b border-white/5 flex items-center justify-between px-8 backdrop-blur-xl shrink-0">
+          <h1 className="text-2xl font-semibold">Live Dashboard</h1>
+          
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center border border-white/20 shadow-lg">
+            <span className="font-semibold text-sm">{user?.username?.[0]?.toUpperCase() || 'U'}</span>
+          </div>
+        </header>
+
+        {/* Dashboard View */}
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+          <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+            
+            {error && <AlertToast type="error" message={error} />}
+
+            {/* Overview Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
+                  <Activity className="w-4 h-4 text-blue-400" /> Active Nodes
+                </div>
+                <span className="text-3xl font-bold">{onlineNodes}</span>
+              </div>
+              <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
+                  <Wind className="w-4 h-4 text-teal-400" /> Avg AQI
+                </div>
+                <span className="text-3xl font-bold">{avgAqi}</span>
+              </div>
+              <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
+                  <Thermometer className="w-4 h-4 text-orange-400" /> Avg Temp
+                </div>
+                <span className="text-3xl font-bold">{avgTemp}°C</span>
+              </div>
+              <div className="liquid-glass rounded-2xl p-6 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-white/60 text-sm font-medium">
+                  <AlertTriangle className="w-4 h-4 text-red-400" /> Active Alerts
+                </div>
+                <span className="text-3xl font-bold">{alerts.length}</span>
+              </div>
+            </div>
+
+            <h2 className="text-xl font-semibold mt-4 border-b border-white/10 pb-2">Live Sensor Network</h2>
+
+            {/* Map & Node List */}
+            {loading ? (
+              <LoadingSkeleton />
+            ) : (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {/* Map */}
+                <div className="h-full min-h-[500px]">
+                  <Map 
+                    readings={readings}
+                    onMarkerClick={(reading) => handleNodeClick(reading.node_id)}
+                  />
+                </div>
+
+                {/* Node Cards */}
+                <div className="grid grid-cols-1 gap-4 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
+                  <AnimatePresence>
+                    {readings.length === 0 ? (
+                      <div className="col-span-1 text-center py-12 text-white/60">
+                        No sensor readings available
+                      </div>
+                    ) : (
+                      readings.map((reading) => (
+                        <motion.div 
+                          key={reading.node_id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="liquid-glass rounded-3xl p-6 relative overflow-hidden group cursor-pointer hover:bg-white/10 transition-all"
+                          onClick={() => handleNodeClick(reading.node_id)}
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h3 className="text-lg font-bold flex items-center gap-2">
+                                {reading.node_id}
+                                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                              </h3>
+                              <p className="text-white/50 text-xs mt-1">
+                                {reading.lat.toFixed(4)}, {reading.lon.toFixed(4)}
+                              </p>
+                            </div>
+                            <AQIBadge aqi={reading.aqi} category={reading.aqi_category} size="sm" />
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                            <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
+                              <span className="text-white/50 text-xs flex items-center gap-1"><Wind className="w-3 h-3" /> PM2.5</span>
+                              <span className="font-semibold">{reading.pm25.toFixed(0)}</span>
+                            </div>
+                            <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
+                              <span className="text-white/50 text-xs flex items-center gap-1"><Thermometer className="w-3 h-3" /> Temp</span>
+                              <span className="font-semibold">{reading.temperature.toFixed(1)}°C</span>
+                            </div>
+                            <div className="bg-black/20 rounded-xl p-3 flex flex-col gap-1">
+                              <span className="text-white/50 text-xs flex items-center gap-1"><Droplets className="w-3 h-3" /> Humid</span>
+                              <span className="font-semibold">{reading.humidity.toFixed(0)}%</span>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center text-xs text-white/40 mt-4 pt-3 border-t border-white/5">
+                            <span className="flex items-center gap-1"><Battery className="w-3 h-3" /> {reading.battery_v.toFixed(2)}V</span>
+                            <span>{new Date(reading.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Alerts */}
+            {alerts.length > 0 && (
+              <>
+                <h2 className="text-xl font-semibold mt-8 border-b border-white/10 pb-2">Recent Alerts</h2>
+                <div className="grid grid-cols-1 gap-3">
+                  {alerts.slice(0, 5).map(alert => (
+                    <div 
+                      key={alert.alert_id} 
+                      className={`liquid-glass rounded-2xl p-4 border-l-4 ${
+                        alert.severity === 'critical' ? 'border-l-red-500' : 'border-l-yellow-500'
+                      } flex justify-between items-center`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className={`w-5 h-5 mt-0.5 ${alert.severity === 'critical' ? 'text-red-400' : 'text-yellow-400'}`} />
+                        <div>
+                          <p className="font-semibold text-sm">{alert.node_id} - {alert.parameter.toUpperCase()} Alert</p>
+                          <p className="text-white/60 text-xs">Value: {alert.value.toFixed(1)} (Threshold: {alert.threshold.toFixed(1)})</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => navigate('/dashboard/alerts')}
+                        className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs font-medium transition-all"
+                      >
+                        View
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 }

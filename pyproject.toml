@@ -1,0 +1,6 @@
+[tool.pyrefly]
+project_includes = ["backend/**/*.py"]
+project_excludes = ["__pyrefly_virtual__/**", ".venv/**", "node_modules/**", "__pycache__/**"]
+
+[tool.pyrefly.errors]
+bad-assignment = false

@@ -1,0 +1,69 @@
+# =============================================================================
+# EMPYREAN — Docker Compose (FUTURE: TimescaleDB Migration)
+# =============================================================================
+# STATUS: Not in use yet. Currently using Firebase/Firestore for the prototype.
+#
+# HOW TO USE (when ready to migrate):
+#   1. Install Docker Desktop: https://www.docker.com/products/docker-desktop/
+#   2. Open a terminal in this folder
+#   3. Run: docker-compose up -d
+#   4. This will start 3 containers: TimescaleDB, Redis, Mosquitto
+#   5. The init.sql script (backend/db/init.sql) runs automatically on first boot
+#   6. Rewrite backend/app.py to use psycopg2 instead of firebase-admin
+#
+# WHY MIGRATE:
+#   - TimescaleDB hypertables are 1000x+ faster for time-range queries at scale
+#   - Redis caching reduces DB load (dashboard polls every 5s)
+#   - Local Mosquitto broker gives you full control over MQTT (TLS, auth, QoS)
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # PRIMARY DATABASE — TimescaleDB (PostgreSQL + time-series extension)
+  # Stores: sensor_readings (hypertable), nodes, alerts, hourly_agg (continuous aggregate)
+  # Connect with: postgresql://empyrean_user:empyrean_pass@localhost:5432/airquality
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: empyrean-db
+    environment:
+      - POSTGRES_USER=empyrean_user
+      - POSTGRES_PASSWORD=empyrean_pass       # TODO: Change this in production
+      - POSTGRES_DB=airquality
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql  # Auto-runs on first boot
+    restart: unless-stopped
+
+  # CACHE + MESSAGE BROKER — Redis
+  # Used for: latest-reading cache (TTL 60s), rate limiting, Celery task broker
+  # Connect with: redis://localhost:6379/0
+  redis:
+    image: redis:7-alpine
+    container_name: empyrean-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # MQTT BROKER — Eclipse Mosquitto
+  # Used for: receiving sensor data from ESP32 devices
+  # Currently using public broker (broker.hivemq.com) — this replaces it with a local one
+  # Port 1883 = plaintext MQTT, Port 8883 = MQTTS (TLS, configure certs in mosquitto.conf)
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: empyrean-mqtt
+    ports:
+      - "1883:1883"
+      - "8883:8883"
+    volumes:
+      - ./backend/mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    restart: unless-stopped
+
+volumes:
+  timescaledb_data:
+  mosquitto_data:
+  mosquitto_log:
