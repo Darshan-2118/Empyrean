@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../services/useAuth';
-import { getAlerts } from '../services/api';
+import { useAuth } from '../../services/useAuth';
+import { getAlerts } from '../../services/api';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, User, Settings, LogOut, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 
@@ -63,8 +63,8 @@ export default function TopBar({ title, alertCount = 0 }: TopBarProps) {
         const response = await getAlerts(token, 10);
         const alertsList = Array.isArray(response) ? response : [];
         setRecentAlerts(alertsList.filter(a => !a.acknowledged_at));
-      } catch (err) {
-        console.error(err);
+      } catch {
+        // silently ignore alert polling errors
       }
     };
     loadAlerts();

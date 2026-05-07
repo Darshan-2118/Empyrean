@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import AdminLayout from './AdminLayout';
+import AdminLayout from '../../components/admin/AdminLayout';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, Cpu, Edit2, Trash2, Plus, Shield, User as UserIcon, Check, X } from 'lucide-react';
-import { AlertToast } from '../AlertToast';
+import { AlertToast } from '../../components/common/AlertToast';
 
 interface UserRecord {
   uid: string;

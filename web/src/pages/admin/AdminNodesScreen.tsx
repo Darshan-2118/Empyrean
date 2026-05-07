@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../services/useAuth';
 import { getAllNodes, updateNode } from '../../services/api';
-import AdminLayout from './AdminLayout';
-import { AlertToast } from '../AlertToast';
-import { Map } from '../Map';
+import AdminLayout from '../../components/admin/AdminLayout';
+import { AlertToast } from '../../components/common/AlertToast';
+import { Map } from '../../components/map/Map';
 import { Edit2, Battery, Clock, MapPin, Wifi, WifiOff, Check, X, Cpu, User as UserIcon, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 

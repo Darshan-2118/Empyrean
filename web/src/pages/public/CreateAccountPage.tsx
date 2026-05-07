@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, ShieldCheck, Key, User, Users, CheckCircle, Check, X } from 'lucide-react';
-import Stepper, { Step } from './Stepper';
+import Stepper, { Step } from '../../components/onboarding/Stepper';
 
 export default function CreateAccountPage() {
     const navigate = useNavigate();

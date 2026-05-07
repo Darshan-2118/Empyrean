@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../services/useAuth';
+import { useAuth } from '../../services/useAuth';
 import { LayoutDashboard, History as HistoryIcon, Bell, User, Cpu } from 'lucide-react';
 
 function getAvatarColor(name: string): string {
