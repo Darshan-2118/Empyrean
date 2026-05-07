@@ -1,3 +1,6 @@
+### Firebase Credentials (NEVER commit this) ###
+serviceAccountKey.json
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/

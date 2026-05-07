@@ -7,7 +7,10 @@ interface MapProps {
 }
 
 export const Map: React.FC<MapProps> = ({ markers }) => {
-  const mapHtml = `
+  const webviewRef = React.useRef<WebView>(null);
+  const iframeRef = React.useRef<any>(null);
+
+  const mapHtml = React.useMemo(() => `
     <!DOCTYPE html>
     <html>
       <head>
@@ -28,25 +31,58 @@ export const Map: React.FC<MapProps> = ({ markers }) => {
             attribution: '© OpenStreetMap'
           }).addTo(map);
 
-          const markersData = ${JSON.stringify(markers)};
-          markersData.forEach(m => {
-            const circle = L.circleMarker([m.lat, m.lon], {
-              color: m.color,
-              fillColor: m.color,
-              fillOpacity: 0.8,
-              radius: 10
-            }).addTo(map);
-            circle.bindPopup("<b>" + m.label + "</b><br>AQI: " + m.aqi);
+          let currentLayers = [];
+          window.updateMarkers = function(markersData) {
+            currentLayers.forEach(layer => map.removeLayer(layer));
+            currentLayers = [];
+            markersData.forEach(m => {
+              const circle = L.circleMarker([m.lat, m.lon], {
+                color: m.color,
+                fillColor: m.color,
+                fillOpacity: 0.8,
+                radius: 10
+              }).addTo(map);
+              circle.bindPopup("<b>" + m.label + "</b><br>AQI: " + m.aqi);
+              currentLayers.push(circle);
+            });
+          };
+
+          // Listen for iframe postMessage
+          window.addEventListener('message', function(event) {
+            try {
+              const data = JSON.parse(event.data);
+              if (data && data.type === 'UPDATE_MARKERS') {
+                window.updateMarkers(data.markers);
+              }
+            } catch(e) {}
           });
         </script>
       </body>
     </html>
-  `;
+  `, []);
+
+  React.useEffect(() => {
+    if (Platform.OS === 'web') {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(JSON.stringify({ type: 'UPDATE_MARKERS', markers }), '*');
+      }
+    } else {
+      if (webviewRef.current) {
+        webviewRef.current.injectJavaScript(`
+          if (window.updateMarkers) {
+            window.updateMarkers(${JSON.stringify(markers)});
+          }
+          true;
+        `);
+      }
+    }
+  }, [markers]);
 
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container}>
         <iframe 
+          ref={iframeRef}
           srcDoc={mapHtml} 
           style={{ width: '100%', height: '100%', border: 'none' }} 
         />
@@ -57,6 +93,7 @@ export const Map: React.FC<MapProps> = ({ markers }) => {
   return (
     <View style={styles.container}>
       <WebView 
+        ref={webviewRef}
         originWhitelist={['*']}
         source={{ html: mapHtml }}
         style={styles.map}

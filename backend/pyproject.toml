@@ -1,0 +1,13 @@
+[tool.pyrefly]
+
+# Exclude virtual/in-memory analysis files and non-project directories
+exclude = [
+    "__pyrefly_virtual__",
+    ".venv",
+    "node_modules",
+    "__pycache__",
+]
+
+[tool.pyrefly.errors]
+# Suppress false positives from Pyrefly analyzing code fragments in isolation
+bad-assignment = false
